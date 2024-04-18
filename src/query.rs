@@ -11,14 +11,6 @@ impl Query {
     async fn hello(&self) -> String {
         "Hello, world!!!!!!".to_string()
     }
-
-    // Asynchronously return the GraphiQL page
-    
-    // Asynchronously return a static string
-    // async fn hello_world(&self) -> &'static str {
-    //     "Hello, world!"
-    // }
-
     async fn hello_rorld(&self) -> &'static str {
         "Hello, world!"
     }
