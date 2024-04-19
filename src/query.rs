@@ -1,6 +1,10 @@
 use async_graphql::{*};
+use axum::body::Body;
+use axum::http::Request;
 use sqlx:: PgPool;
+use uuid::Uuid;
 use crate::model::User;
+use crate::guard::{Claims, AuthClaims};
 
 pub struct Query;
 
@@ -14,8 +18,18 @@ impl Query {
     async fn hello_rorld(&self) -> &'static str {
         "Hello, world!"
     }
-
+    
     async fn get_users(&self, context:&Context<'_>) -> Result<Option<Vec<User>>, String>{
+
+        // let user_uuid = match context.data::<AuthClaims>() {
+        //     Ok(uuid) => uuid.clone(), // Clone the UUID to avoid lifetime issues
+        //     Err(_) => return Err("UUID not found in request extensions".to_string()),
+        // };
+    
+        let user_uuid:&AuthClaims = context.data_opt().unwrap();
+
+        println!("HEY {:?}",user_uuid);
+
         let db_pool = match context.data::<PgPool>() {
             Ok(db) => db,
             Err(err) => return Err(err.message.to_string()),

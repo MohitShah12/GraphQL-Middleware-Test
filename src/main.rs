@@ -1,13 +1,13 @@
 use std::time::Duration;
 use async_graphql::{http::GraphiQLSource, *};
-use async_graphql_axum::GraphQL;
+use async_graphql_axum::{GraphQL, GraphQLRequest, GraphQLResponse};
 use axum::{
     response::{Html, IntoResponse},
     routing::get,
-    Router
+    Router, Extension, middleware
 };
 use sqlx::{postgres::{PgPoolOptions}};
-use crate::mutation::Mutation;
+use crate::{mutation::Mutation};
 use crate::query::Query;
 
 mod mutation;
@@ -15,9 +15,14 @@ mod query;
 mod model;
 mod guard;
 
+use crate::guard::AuthClaims;
+
 async fn graphql() -> impl IntoResponse {
     Html(GraphiQLSource::build().endpoint("/graphql").finish())
 }
+
+
+
 // Main function
 #[shuttle_runtime::main]
 async fn main() -> shuttle_axum::ShuttleAxum {
@@ -32,7 +37,8 @@ async fn main() -> shuttle_axum::ShuttleAxum {
 
     // Build the GraphQL Schema
     let schema = Schema::build(Query, Mutation, EmptySubscription)
-        .data(db_pool.clone())
+        .data(db_pool.clone()) 
+        .data(AuthClaims { uuid: String::new() })
         .finish();
     // Build the router
     let router = Router::new()
