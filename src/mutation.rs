@@ -1,14 +1,24 @@
 #![allow(deprecated)]
+
 use async_graphql:: *;
-use chrono::Utc;
+use chrono::{Utc, Duration};
+use jsonwebtoken::{encode, Header, EncodingKey};
+use serde::{Serialize, Deserialize};
 use shuttle_runtime::__internals::serde_json::json;
-use sqlx::{PgPool};
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
-use bcrypt::{DEFAULT_COST, hash};
+use bcrypt::{DEFAULT_COST, hash, verify};
 
 use crate::model::User;
 
 pub struct Mutation;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Claims{
+    iat:usize,
+    exp:usize,
+    uuid:Uuid
+}
 
 #[Object]
 impl Mutation{
@@ -117,5 +127,64 @@ impl Mutation{
         };
 
         Ok(json!({"message":"User was deleted"}).to_string())
+    }
+
+    pub async fn login_user(&self, context:&Context<'_>, email:String, password:String) -> Result<String, String>{
+        let db = match context.data::<PgPool>(){
+            Ok(db) => db,
+            Err(err) => return Err(err.message.to_string())
+        };
+
+        println!("{}",email);
+
+       let find_user = sqlx::query("SELECT * FROM public.user WHERE email = $1")
+       .bind(email)
+       .fetch_all(db)
+       .await
+       .map_err(|err| err.to_string())?;
+
+       if !find_user.is_empty() {
+        let user = &find_user[0];
+        let user_pass = match user.try_get::<String, _>("password"){
+            Ok(pass) => pass,
+            Err(err) => return Err(err.to_string())
+        };
+
+        let verified_pass =match verify(password, &user_pass){
+            Ok(verified_pass) => verified_pass,
+            Err(err) => return Err(err.to_string())
+        };
+
+        if !verified_pass{
+            return Err(json!({"message":"Wrong Credentials authentication failed"}).to_string());
+        }
+
+        let now = Utc::now();
+        let exp = Duration::hours(24);
+        let uuid = match user.try_get::<Uuid, _>("uuid") {
+            Ok(uuid) => uuid,
+            Err(err) => return Err(err.to_string())
+        };
+
+        let claims = Claims{
+            iat: now.timestamp() as usize,
+            exp:(now + exp).timestamp() as usize,
+            uuid:uuid
+        };
+
+        let secret = "mYsEcReTKeY".to_string().clone();
+
+        let token = match encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_ref())){
+            Ok(token) => token,
+            Err(err) => return Err(err.to_string())
+        };
+
+        // println!("{:?}", uuid);
+        Ok(token)
+    } else {
+        Err("No user was found with given email".to_string())
+    }
+        
+
     }
 }

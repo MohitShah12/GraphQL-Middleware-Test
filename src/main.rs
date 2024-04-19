@@ -13,6 +13,8 @@ use crate::query::Query;
 mod mutation;
 mod query;
 mod model;
+mod guard;
+
 async fn graphql() -> impl IntoResponse {
     Html(GraphiQLSource::build().endpoint("/graphql").finish())
 }
@@ -34,7 +36,6 @@ async fn main() -> shuttle_axum::ShuttleAxum {
         .finish();
     // Build the router
     let router = Router::new()
-        // .route("/getuser", get(get_users))
         .route("/graphql", get(graphql).post_service(GraphQL::new(schema)))
         .with_state(db_pool);
     println!("Shuttle is running");
