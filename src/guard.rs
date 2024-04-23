@@ -1,38 +1,9 @@
-use axum::{http::{Request, request::Parts},response::Response, body::Body, middleware::Next, extract::{FromRequest, FromRequestParts}, Extension, RequestPartsExt};
+use axum::{http::{request::Parts}, extract::{FromRequestParts}, async_trait};
 use axum_extra::{headers::{HeaderMapExt, Authorization, authorization::Bearer}};
 use jsonwebtoken::{TokenData, decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use shuttle_runtime::__internals::serde_json::json;
 use uuid::Uuid;
-use async_graphql::{Context, InputObject, Object};
-
-
-
-
-
-
-// pub async fn guard(mut req:Request<Body>, next:Next) -> Result<Response, String>{
-//     let token = req.headers().typed_get::<Authorization<Bearer>>()
-//     .ok_or(json!({"error":"No token was provided"}).to_string())?
-//     .token()
-//     .to_owned();
-
-//     let user = match decode_jwt(token){
-//         Ok(user) => user,
-//         Err(err) => return Err(err.to_string())
-//     }
-//     .claims;
-//     println!("{}", user.uuid.clone());
-//     let auth_user = AuthClaims{
-//         uuid:user.uuid.to_string(),
-//     };
-
-//     req.extensions_mut().insert(auth_user);
-
-//     println!("{:?}",req.extensions());
-
-//     Ok(next.run(req).await)
-// }
+use shuttle_runtime::__internals::serde_json::json;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Claims{
@@ -40,10 +11,8 @@ pub struct Claims{
     uuid:Uuid
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, InputObject)]
-pub struct AuthClaims{
-    pub uuid:String
-}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthClaims(pub Option<String>);
 
 fn decode_jwt(jwt:String) -> Result<TokenData<Claims>, String>{
     let secret = "mYsEcReTKeY".to_string().clone();
@@ -54,33 +23,29 @@ fn decode_jwt(jwt:String) -> Result<TokenData<Claims>, String>{
     return Ok(decoded_token);
 }
 
-#[axum::async_trait]
+#[async_trait]
 impl <S> FromRequestParts<S> for AuthClaims 
 where   
     S: Send + Sync
 {
-    type Rejection = &'static str;
+    type Rejection = String;
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection>{
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection>{
        let headers = parts.headers.clone();
 
        let token = headers.typed_get::<Authorization<Bearer>>()
-       .ok_or("No token provided")?
+       .ok_or(json!({"error":"No token provided"}).to_string())?
        .token()
        .to_owned();
 
         let user = match decode_jwt(token){
             Ok(user) => user,
-            Err(err) => return Err("There was problem with decoding token")
+            Err(err) => return Err(json!({"error":err}).to_string())
         }
         .claims;
         println!("{}", user.uuid.clone());
-
-        let auth_user = AuthClaims{
-            uuid:user.uuid.to_string(),
-        };
         
-        Ok(auth_user)
+        Ok(AuthClaims(Some(user.uuid.to_string())))
     }
     
 }

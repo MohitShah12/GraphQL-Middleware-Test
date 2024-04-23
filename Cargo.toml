@@ -17,3 +17,4 @@ tokio = "1.28.2"
 uuid = { version = "1.4.1", features = ["v4"] }
 serde = { version = "1.0.197", features = ["derive"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
+tower = "0.4.13"

@@ -364,6 +364,7 @@ dependencies = [
  "shuttle-runtime",
  "sqlx",
  "tokio",
+ "tower",
  "uuid",
 ]
 
